@@ -9,53 +9,103 @@ import java.util.HashSet;
 public class HypophosphoricAcid {
 
 
-  public static void init() {
+    static Semaphore oxygen;
+    static Semaphore phosphorus;
+    static Semaphore hydrogen;
 
+    static Semaphore phosphorusHere;
+    static Semaphore hydrogenHere;
 
-  }
+    static Semaphore ready;
+    static Semaphore finished;
 
+    static Semaphore lock;
 
-  public static class Phosphorus extends TemplateThread {
+    static int countOxygen;
+    public static void init(){
+        phosphorus = new Semaphore(2);
+        oxygen = new Semaphore(6);
+        hydrogen = new Semaphore(4);
 
-    public Phosphorus(int numRuns) {
-      super(numRuns);
+        phosphorusHere = new Semaphore(0);
+        hydrogenHere = new Semaphore(0);
+
+        ready = new Semaphore(0);
+        finished = new Semaphore(0);
+
+        lock = new Semaphore(1);
+
+        countOxygen = 0;
+    }
+    public static class Phosphorus extends TemplateThread {
+
+        public Phosphorus(int numRuns) {
+            super(numRuns);
+        }
+
+        @Override
+        public void execute() throws InterruptedException {
+            phosphorus.acquire();
+            phosphorusHere.release();
+            ready.acquire();
+            state.bond();
+            finished.release();
+        }
+
     }
 
-    @Override
-    public void execute() throws InterruptedException {
-      state.bond();
-      state.validate();
+    public static class Hydrogen extends TemplateThread {
+
+        public Hydrogen(int numRuns) {
+            super(numRuns);
+        }
+
+        @Override
+        public void execute() throws InterruptedException {
+            hydrogen.acquire();
+            hydrogenHere.release();
+            ready.acquire();
+            state.bond();
+            finished.release();
+        }
+
     }
 
-  }
+    public static class Oxygen extends TemplateThread {
 
-  public static class Hydrogen extends TemplateThread {
+        public Oxygen(int numRuns) {
+            super(numRuns);
+        }
 
-    public Hydrogen(int numRuns) {
-      super(numRuns);
+        @Override
+        public void execute() throws InterruptedException {
+            oxygen.acquire();
+
+            lock.acquire();
+            countOxygen++;
+            if(countOxygen == 6){
+                hydrogenHere.acquire(4);
+                phosphorusHere.acquire(2);
+                ready.release(12);
+            }
+            lock.release();
+
+            ready.acquire();
+            state.bond();
+            finished.release();
+
+            lock.acquire();
+            countOxygen--;
+            if(countOxygen == 0){
+                finished.acquire(12);
+                state.validate();
+                oxygen.release(6);
+                hydrogen.release(4);
+                phosphorus.release(2);
+            }
+            lock.release();
+        }
     }
-
-    @Override
-    public void execute() throws InterruptedException {
-      state.bond();
-      state.validate();
-    }
-
-  }
-
-  public static class Oxygen extends TemplateThread {
-
-    public Oxygen(int numRuns) {
-      super(numRuns);
-    }
-
-    @Override
-    public void execute() throws InterruptedException {
-      state.bond();
-      state.validate();
-    }
-
-  }
 
 
   static HypophosphoricAcidState state = new HypophosphoricAcidState();
