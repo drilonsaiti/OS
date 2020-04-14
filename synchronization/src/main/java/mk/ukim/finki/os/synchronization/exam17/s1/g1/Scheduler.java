@@ -54,7 +54,7 @@ public class Scheduler extends Thread {
         Process process = next();
         if (process != null) {
           process.execute();
-          process.join();
+          process.join(100);
         }
 
       }
