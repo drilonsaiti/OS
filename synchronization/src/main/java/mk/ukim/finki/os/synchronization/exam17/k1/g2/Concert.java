@@ -9,52 +9,104 @@ import java.util.HashSet;
 public class Concert {
 
 
-  public static void init() {
+  static Semaphore performer;
+    static Semaphore bariton;
+    static Semaphore tenor;
 
+    static Semaphore tenorbaritonHere;
+    static Semaphore baritonHere;
+    static Semaphore readyBaritonTenor ;
 
-  }
+    static Semaphore ready;
+    static Semaphore finished;
+    static Semaphore next;
+    
+    public static void init() {
+        performer = new Semaphore(1);
+        bariton = new Semaphore(3);
+        tenor = new Semaphore(3);
 
-  public static class Performer extends TemplateThread {
+        baritonHere = new Semaphore(0);
+        readyBaritonTenor = new Semaphore(0);
+        tenorbaritonHere = new Semaphore(0);
 
-    public Performer(int numRuns) {
-      super(numRuns);
+        ready = new Semaphore(0);
+        finished = new Semaphore(0);
+        next = new Semaphore(0);
+
     }
 
-    @Override
-    public void execute() throws InterruptedException {
-      state.perform();
-      state.vote();
+    public static class Performer extends TemplateThread {
+
+        public Performer(int numRuns) {
+            super(numRuns);
+        }
+
+        @Override
+        public void execute() throws InterruptedException {
+            performer.acquire();
+            tenorbaritonHere.acquire(6);
+
+            ready.release(6);
+            state.perform();
+            finished.acquire(6);
+
+            next.release(6);
+            state.vote();
+            performer.release();
+        }
+
     }
 
-  }
+    public static class Baritone extends TemplateThread {
 
-  public static class Baritone extends TemplateThread {
+        public Baritone(int numRuns) {
+            super(numRuns);
+        }
 
-    public Baritone(int numRuns) {
-      super(numRuns);
+        @Override
+        public void execute() throws InterruptedException {
+            bariton.acquire();
+            baritonHere.release();
+
+            readyBaritonTenor.acquire();
+            state.formBackingVocals();
+            tenorbaritonHere.release();
+
+            ready.acquire();
+            state.perform();
+            finished.release();
+
+            next.acquire();
+            bariton.release();
+        }
     }
 
-    @Override
-    public void execute() throws InterruptedException {
-      state.formBackingVocals();
-      state.perform();
+    public static class Tenor extends TemplateThread {
+
+        public Tenor(int numRuns) {
+            super(numRuns);
+        }
+
+        @Override
+        public void execute() throws InterruptedException {
+            tenor.acquire();
+            baritonHere.acquire();
+
+            readyBaritonTenor.release();
+            state.formBackingVocals();
+            tenorbaritonHere.release();
+
+            ready.acquire();
+            state.perform();
+            finished.release();
+
+            next.acquire();
+            tenor.release();
+
+        }
+
     }
-
-  }
-
-  public static class Tenor extends TemplateThread {
-
-    public Tenor(int numRuns) {
-      super(numRuns);
-    }
-
-    @Override
-    public void execute() throws InterruptedException {
-      state.formBackingVocals();
-      state.perform();
-    }
-
-  }
 
   static ConcertState state = new ConcertState();
 
